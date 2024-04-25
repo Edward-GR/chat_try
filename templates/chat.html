@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Чат</title>
+  <script src="https://cdn.jsdelivr.net/npm/pywebio@latest/dist/pywebio.js"></script>
+</head>
+<body>
+  <div id="chat-container"></div>
+  <script>
+    pywebio.main(async () => {
+      const msg_box = pywebio.output();
+      pywebio.scrollable(msg_box, {height: 300, keepBottom: true});
+
+      const nickname = await pywebio.input("Войти в чат", {required: true, placeholder: "Ваше имя", validate: n => n in online_users || n == '📢' ? "Такой ник уже используется!" : null});
+      online_users.add(nickname);
+
+      chat_msgs.push((📢, ${nickname} присоединился к чату!));
+      msg_box.append(pywebio.markdown(📢 ${nickname} присоединился к чату));
+
+      const refresh_task = pywebio.runAsync(refreshMsg(nickname, msg_box));
+
+      while (true) {
+        const data = await pywebio.inputGroup("💭 Новое сообщение", [
+          pywebio.input({ placeholder: "Текст сообщения ...", name: "msg" }),
+          pywebio.actions({ name: "cmd", buttons: ["Отправить", { label: "Выйти из чата", type: 'cancel' }] })
+        ], {
+          validate: m => m["cmd"] == "Отправить" && !m['msg'] ? ('msg', "Введите текст сообщения!") : null
+        });
+
+        if (data === null) {
+          break;
+        }
+
+        msg_box.append(pywebio.markdown(${nickname}: ${data['msg']}));
+        chat_msgs.push((nickname, data['msg']));
+      }
+
+      refresh_task.close();
+
+      online_users.delete(nickname);
+      pywebio.toast("Вы вышли из чата!");
+      msg_box.append(pywebio.markdown(📢 Пользователь ${nickname} покинул чат!));
+      chat_msgs.push((📢, Пользователь ${nickname} покинул чат!));
+
+      pywebio.putButtons(['Перезайти'], { onclick: () => pywebio.runJs('window.location.reload()') });
+    });
+
+    async function refreshMsg(nickname, msg_box) {
+      let last_idx = chat_msgs.length;
+
+      while (true) {
+        await pywebio.sleep(1);
+
+        for (const m of chat_msgs.slice(last_idx)) {
+          if (m[0] != nickname) { // if not a message from current user
+            msg_box.append(pywebio.markdown(${m[0]}: ${m[1]}));
+          }
+        }
+
+        // remove expired
+        if (chat_msgs.length > MAX_MESSAGES_COUNT) {
+          chat_msgs = chat_msgs.slice(chat_msgs.length / 2);
+        }
+
+        last_idx = chat_msgs.length;
+      }
+    }
+  </script>
+</body>
+</html>
